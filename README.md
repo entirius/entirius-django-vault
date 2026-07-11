@@ -1,0 +1,51 @@
+# Django Vault
+
+Customer payment-card vault for the Volkanos ecommerce platform. Stores tokenized PayU cards per
+customer and channel, exposed through an X-API-KEY-protected REST API — companion module to
+[entirius-django-accounts](https://github.com/entirius/entirius-django-accounts).
+
+## Installation
+
+```shell
+pip install entirius-django-vault
+```
+
+Add the app to your project:
+
+```python
+INSTALLED_APPS = [
+    ...
+    "django_vault",
+]
+```
+
+Requires `django_accounts` in `INSTALLED_APPS` (schema dependency) and the host settings
+`BI_ENVIRONMENT` + `BI_BUSINESS_UNIT`. Include the API with your URLconf:
+
+```python
+urlpatterns += [path("", include("django_vault.urls"))]
+```
+
+## Usage
+
+Generate an API key and call the vault API (see [docs/vault_docs.md](docs/vault_docs.md)):
+
+```bash
+python manage.py vault-generate-api-key [--file_path <path>]
+```
+
+Log codes reference: [docs/log_codes.md](docs/log_codes.md).
+
+## Development
+
+```shell
+make install     # sync dependencies (uv)
+make check       # lint + format check (ruff)
+make test        # test suite (pytest + pytest-django)
+```
+
+Architecture and settings reference: [AGENTS.md](AGENTS.md).
+
+## License
+
+Mozilla Public License 2.0 — see [LICENSE](LICENSE).
