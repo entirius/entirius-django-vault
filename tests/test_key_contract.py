@@ -14,42 +14,10 @@ The module has no key-free public route: both ``payment_card`` routes are keyed.
 import secrets
 
 import pytest
-from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
-from rest_framework_simplejwt.tokens import RefreshToken
 
 CARDS_URL = "/api/vault/1/{channel_idx}/payment_card/payu_card/"
-CHANNEL_IDXS = ("any-channel", "other-channel")
-
-
-@pytest.fixture(autouse=True)
-def _jwt_backend(settings):
-    """The v1 ``@authenticate`` resolves the customer through django.contrib.auth backends."""
-    settings.AUTHENTICATION_BACKENDS = [
-        "django_accounts.backends.JWTAccessBackend",
-        "django.contrib.auth.backends.ModelBackend",
-    ]
-
-
-@pytest.fixture(autouse=True)
-def _payu_channels(db):
-    """``payment_card/`` (all cards) answers 500 for a customer without a vault today, so the success pin uses
-    ``payment_card/<code>/``, which answers ``[]`` for a channel payment the customer has no vault on."""
-    from django_vault.models.channel import Channel, ChannelPayment
-
-    for idx in CHANNEL_IDXS:
-        ChannelPayment.objects.create(channel=Channel.objects.create(idx=idx, label=idx), provider="payu_card")
-
-
-@pytest.fixture
-def customer_jwt(db) -> str:
-    from allauth.account.models import EmailAddress
-    from django_accounts.models import Customer
-
-    user = get_user_model().objects.create_user(username="cardholder", email="cardholder@example.com")
-    EmailAddress.objects.create(user=user, email=user.email, primary=True, verified=True)
-    Customer.objects.create(user=user)
-    return str(RefreshToken.for_user(user).access_token)
+pytestmark = pytest.mark.usefixtures("payu_channels")
 
 
 def _cards(key: str | None, jwt: str | None = None, channel_idx: str = "any-channel"):
