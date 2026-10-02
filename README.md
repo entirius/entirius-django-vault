@@ -34,6 +34,9 @@ Generate an API key and call the vault API (see [docs/vault_docs.md](docs/vault_
 python manage.py vault-generate-api-key [--file_path <path>]
 ```
 
+With django-access installed the command refuses: keys are access tokens there
+(`manage.py access_token create --scope vault.api --application <name> --expires-days <days>`).
+
 Log codes reference: [docs/log_codes.md](docs/log_codes.md).
 
 ## Development
