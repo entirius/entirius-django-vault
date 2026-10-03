@@ -17,7 +17,7 @@ import pytest
 from rest_framework.test import APIClient
 
 CARDS_URL = "/api/vault/1/{channel_idx}/payment_card/payu_card/"
-pytestmark = pytest.mark.usefixtures("payu_channels")
+pytestmark = pytest.mark.usefixtures("payu_channels", "_jwt_backend")
 
 
 def _cards(key: str | None, jwt: str | None = None, channel_idx: str = "any-channel"):

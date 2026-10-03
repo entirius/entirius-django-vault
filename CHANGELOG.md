@@ -6,4 +6,5 @@
   `verify_api_key` (scope `vault.api`, global — no channel pin), never the legacy table; the refusal stays
   401 "Invalid api key". Without django-access nothing changes. `vault-generate-api-key` then refuses and
   names `access_token create`; the key admin becomes read-only.
+- The legacy key admin states that keys come from `vault-generate-api-key` (a row added by hand is unreadable).
 - The key admin shows only the last four characters of a key and no longer searches by key.

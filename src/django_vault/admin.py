@@ -19,12 +19,15 @@ class CustomerPaymentVault(admin.ModelAdmin):
 
 @admin.register(APIKey)
 class APIKeyAdmin(admin.ModelAdmin):
-    """Keys show only their last four characters; with django_access installed they are read-only (tokens rule)."""
+    """Keys show only their last four characters; with django_access installed they are read-only (tokens rule).
+
+    Legacy path: a key's value is shown once, by ``vault-generate-api-key``; a row added here has a random value
+    nobody can read back, so create keys with the command and use this page to review or delete them.
+    """
 
     model = APIKey
     list_display = ["id", "masked_key", "created_at", "modified_at"]
     list_filter = ["created_at", "modified_at"]
-    exclude = ("key",)
     readonly_fields = ["id", "masked_key", "created_at", "modified_at"]
 
     @admin.display(description="key")

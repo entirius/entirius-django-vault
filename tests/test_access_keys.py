@@ -11,12 +11,15 @@ The keyed views also demand the customer JWT.
 
 import json
 import logging
+import os
 import secrets
 from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
 
+if os.environ.get("ENTIRIUS_TEST_NO_ACCESS"):
+    pytest.skip("legacy path run: django_access is not installed", allow_module_level=True)
 pytest.importorskip("django_access")
 
 from django.contrib import admin  # noqa: E402
@@ -28,13 +31,13 @@ from django_access.services.tokens import hash_key, issue_token, revoke_token, s
 from rest_framework.test import APIClient  # noqa: E402
 
 from django_vault.models import APIKey  # noqa: E402
-from django_vault.utils.api_keys import API_SCOPE  # noqa: E402
+from django_vault.utils.api_keys import API_SCOPE, key_is_valid  # noqa: E402
 
 OTHER_MODULE_SCOPES = ["returns.api", "reviews.moderate"]
 PUBLISHABLE_SCOPE = "checkout.storefront"
 API_KEY, ADMIN_KEY = "HTTP_X_API_KEY", "HTTP_X_API_ADMIN_KEY"
 SYSTEM = Actor()
-pytestmark = pytest.mark.usefixtures("payu_channels")
+pytestmark = pytest.mark.usefixtures("payu_channels", "_jwt_backend")
 
 
 @pytest.fixture
@@ -138,6 +141,32 @@ class TestScopeAndHeader:
         _, raw = issue()
         assert _passed(call(raw, channel_idx="other-channel"))
 
+    def test_non_token_key_with_a_valid_token_in_the_admin_header_is_refused(self, issue, call):
+        _, raw = issue()
+        _, publishable = issue(PUBLISHABLE_SCOPE)
+        wrong = "ent_api_" + secrets.token_urlsafe(32)
+        for valid in (raw, publishable):
+            response = APIClient().get(
+                "/api/vault/1/any-channel/payment_card/payu_card/", **{API_KEY: wrong, ADMIN_KEY: valid}
+            )
+            assert _refused(response)
+
+    def test_token_pinned_to_a_channel_passes_on_every_channel(self, call, db):
+        """Global keys by decision (memo 15): the vault route passes no channel to ``verify_api_key``."""
+        application = Application.objects.create(name="pinned")
+        expiry = timezone.now() + timedelta(days=30)
+        _, raw = issue_token(
+            application, scopes=[API_SCOPE], channel_idx="any-channel", expires_at=expiry, actor=SYSTEM
+        )
+        assert _passed(call(raw, channel_idx="other-channel"))
+
+    def test_refused_key_on_the_card_list_route(self, issue, customer_jwt):
+        _, raw = issue(OTHER_MODULE_SCOPES[0])
+        response = APIClient().get(
+            "/api/vault/1/any-channel/payment_card/", HTTP_AUTHORIZATION=f"Bearer {customer_jwt}", **{API_KEY: raw}
+        )
+        assert _refused(response)
+
     def test_token_without_customer_jwt_is_401(self, issue, call):
         _, raw = issue()
         assert _body(call(raw, with_jwt=False)) == (401, {})
@@ -166,14 +195,25 @@ def test_every_failure_gives_one_response(issue, call):
 
 
 @pytest.mark.django_db
+def test_key_is_valid_attaches_the_token_to_the_request(issue, rf):
+    token, raw = issue()
+    request = rf.get("/", **{API_KEY: raw})
+    assert key_is_valid(request)
+    assert request.access_token.pk == token.pk
+
+
+@pytest.mark.django_db
 def test_presented_value_is_never_logged(issue, call, caplog):
     caplog.set_level(logging.DEBUG)
     _, raw = issue()
-    unknown = "ent_api_" + secrets.token_urlsafe(32)
+    revoked, revoked_raw = issue()
+    revoke_token(revoked, actor=SYSTEM)
+    expired, expired_raw = issue()
+    ApiToken.objects.filter(pk=expired.pk).update(expires_at=timezone.now() - timedelta(minutes=1))
+    refused = ["ent_api_" + secrets.token_urlsafe(32), revoked_raw, expired_raw, issue(OTHER_MODULE_SCOPES[0])[1]]
     assert _passed(call(raw))
-    assert _refused(call(unknown))
-    assert raw not in caplog.text
-    assert unknown not in caplog.text
+    assert all(_refused(call(value)) for value in refused)
+    assert all(value not in caplog.text for value in [raw, *refused])
 
 
 @pytest.mark.django_db
