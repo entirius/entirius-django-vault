@@ -3,7 +3,7 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 """The access path: with django_access installed the X-API-KEY is an access token (``verify_api_key``, scope
-``vault.api``). These keys are global: no channel pin.
+``vault.api``) on the route's channel: an unpinned token works on every channel, a pinned one on its own only.
 
 Legacy keys reach it only through the import (``make_api_key``); the legacy table is never read on this path.
 The keyed views also demand the customer JWT.
@@ -67,12 +67,12 @@ def _refused(response) -> bool:
 
 @pytest.fixture
 def issue(db):
-    """Issue an unpinned token of one scope; a secret scope gets the expiry it must carry."""
+    """Issue a token of one scope (unpinned unless given a channel); a secret scope gets the expiry it must carry."""
     application = Application.objects.create(name="vault-tests")
 
-    def issue(scope: str = API_SCOPE) -> tuple[ApiToken, str]:
+    def issue(scope: str = API_SCOPE, channel_idx: str | None = None) -> tuple[ApiToken, str]:
         expiry = timezone.now() + timedelta(days=30)
-        return issue_token(application, scopes=[scope], channel_idx=None, expires_at=expiry, actor=SYSTEM)
+        return issue_token(application, scopes=[scope], channel_idx=channel_idx, expires_at=expiry, actor=SYSTEM)
 
     return issue
 
@@ -151,14 +151,13 @@ class TestScopeAndHeader:
             )
             assert _refused(response)
 
-    def test_token_pinned_to_a_channel_passes_on_every_channel(self, call, db):
-        """Global keys by decision (memo 15): the vault route passes no channel to ``verify_api_key``."""
-        application = Application.objects.create(name="pinned")
-        expiry = timezone.now() + timedelta(days=30)
-        _, raw = issue_token(
-            application, scopes=[API_SCOPE], channel_idx="any-channel", expires_at=expiry, actor=SYSTEM
-        )
-        assert _passed(call(raw, channel_idx="other-channel"))
+    def test_pinned_token_is_refused_on_another_channel(self, issue, call):
+        _, raw = issue(channel_idx="any-channel")
+        assert _refused(call(raw, channel_idx="other-channel"))
+
+    def test_pinned_token_passes_on_its_own_channel(self, issue, call):
+        _, raw = issue(channel_idx="any-channel")
+        assert _passed(call(raw, channel_idx="any-channel"))
 
     def test_refused_key_on_the_card_list_route(self, issue, customer_jwt):
         _, raw = issue(OTHER_MODULE_SCOPES[0])
@@ -186,6 +185,7 @@ def test_every_failure_gives_one_response(issue, call):
         "revoked": revoked_raw,
         "other module": issue(OTHER_MODULE_SCOPES[0])[1],
         "publishable": issue(PUBLISHABLE_SCOPE)[1],
+        "pinned to another channel": issue(channel_idx="other-channel")[1],
         "legacy table only": legacy_only,
     }
     responses = {kind: call(raw) for kind, raw in keys.items()}
@@ -198,7 +198,7 @@ def test_every_failure_gives_one_response(issue, call):
 def test_key_is_valid_attaches_the_token_to_the_request(issue, rf):
     token, raw = issue()
     request = rf.get("/", **{API_KEY: raw})
-    assert key_is_valid(request)
+    assert key_is_valid(request, "any-channel")
     assert request.access_token.pk == token.pk
 
 
