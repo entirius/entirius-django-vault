@@ -5,6 +5,7 @@
 from django.contrib import admin
 
 from django_vault.models import APIKey, Channel, ChannelPayment, CustomerPaymentVault
+from django_vault.utils.api_keys import access_installed, mask_key
 
 
 @admin.register(CustomerPaymentVault)
@@ -18,11 +19,29 @@ class CustomerPaymentVault(admin.ModelAdmin):
 
 @admin.register(APIKey)
 class APIKeyAdmin(admin.ModelAdmin):
+    """Keys show only their last four characters; with django_access installed they are read-only (tokens rule).
+
+    Legacy path: a key's value is shown once, by ``vault-generate-api-key``; a row added here has a random value
+    nobody can read back, so create keys with the command and use this page to review or delete them.
+    """
+
     model = APIKey
-    list_display = ["id", "key", "created_at", "modified_at"]
+    list_display = ["id", "masked_key", "created_at", "modified_at"]
     list_filter = ["created_at", "modified_at"]
-    search_fields = ["key"]
-    readonly_fields = ["id", "created_at", "modified_at"]
+    readonly_fields = ["id", "masked_key", "created_at", "modified_at"]
+
+    @admin.display(description="key")
+    def masked_key(self, obj) -> str:
+        return mask_key(obj.key)
+
+    def has_add_permission(self, request) -> bool:
+        return not access_installed() and super().has_add_permission(request)
+
+    def has_change_permission(self, request, obj=None) -> bool:
+        return not access_installed() and super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None) -> bool:
+        return not access_installed() and super().has_delete_permission(request, obj)
 
 
 class ChannelPaymentInline(admin.TabularInline):

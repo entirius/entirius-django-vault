@@ -14,6 +14,7 @@ distribution `entirius-django-vault`, Django app `django_vault`.
 | `make check` | lint + format-check (ruff) |
 | `make fix` | auto-fix lint + format |
 | `make test` | test suite (pytest + pytest-django) |
+| `make test-legacy` | test suite without django_access (legacy key path) |
 
 ## Conventions
 
@@ -29,7 +30,8 @@ distribution `entirius-django-vault`, Django app `django_vault`.
 
 ```
 urls.py  →  views/vault_api.py (get_payment_cards, process_payment_card)
-              @authenticate + @authorize_api (X-API-KEY ↔ models.APIKey)
+              @authenticate + @authorize_api (X-API-KEY ↔ models.APIKey; with django_access
+              installed an access token of scope vault.api — utils/api_keys.py)
               → models.CustomerPaymentVault (FK django_accounts.Customer, per ChannelPayment)
               → domain/payment_provider/payu_payment_vault.py → payu-sdk (tokenized cards)
 ```
