@@ -3,9 +3,6 @@
 Customer payment-card vault with PayU tokenized cards behind an X-API-KEY REST API —
 distribution `entirius-django-vault`, Django app `django_vault`.
 
-**Tech:** Python >=3.11, Django >=5.0, entirius-py-payu-sdk, entirius-django-utils
-(API decorators), entirius-django-accounts (schema dependency)
-
 ## Commands
 
 | Command | Meaning |
@@ -25,6 +22,7 @@ distribution `entirius-django-vault`, Django app `django_vault`.
 - Never rename the package / Django app_label / DB table prefix `django_vault` — it is a schema contract.
 - Migrations are part of the public contract — never edit an already released migration.
 - Default: do not commit — git is the user's call.
+- No AI attribution in commits or PR descriptions.
 
 ## Architecture
 
@@ -48,6 +46,12 @@ urls.py  →  views/vault_api.py (get_payment_cards, process_payment_card)
 | `bi.py` | bievents base event (reads `BI_ENVIRONMENT`/`BI_BUSINESS_UNIT` at import) |
 | `management/commands/vault-generate-api-key.py` | API-key generator (writes under `DATA_DIR`) |
 
+| Topic | Where |
+|---|---|
+| API reference | `docs/vault_docs.md` |
+| Log codes | `docs/log_codes.md` |
+| Key check (access token or legacy key) | `src/django_vault/utils/api_keys.py` |
+
 ## Settings
 
 | Setting | Default | Purpose |
@@ -56,8 +60,6 @@ urls.py  →  views/vault_api.py (get_payment_cards, process_payment_card)
 | `BI_ENVIRONMENT` | — (required) | bievents environment; read at import of `bi.py` |
 | `BI_BUSINESS_UNIT` | — (required) | bievents business unit; read at import of `bi.py` |
 | `DATA_DIR` | — | target dir for `vault-generate-api-key` without `--file_path` |
-
-Log codes reference: `docs/log_codes.md`; API reference: `docs/vault_docs.md`.
 
 ## Gotchas
 
